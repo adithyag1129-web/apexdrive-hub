@@ -6,12 +6,13 @@ import VehicleModal from './components/VehicleModal';
 import CompareModal from './components/CompareModal';
 import GuidesSection from './components/GuidesSection';
 import Footer from './components/Footer';
-import { vehicles, categories } from './data/vehicles';
-import { ArrowUpDown, SlidersHorizontal, ArrowLeftRight, Check, X } from 'lucide-react';
+import { vehicles, categories, availableYears } from './data/vehicles';
+import { ArrowUpDown, SlidersHorizontal, ArrowLeftRight, Calendar, X } from 'lucide-react';
 
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedYear, setSelectedYear] = useState('All Years');
   const [sortBy, setSortBy] = useState('featured');
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [compareList, setCompareList] = useState([]);
@@ -36,7 +37,6 @@ export default function App() {
         return prev.filter((v) => v.id !== vehicle.id);
       }
       if (prev.length >= 2) {
-        // Replace second or alert
         return [prev[0], vehicle];
       }
       return [...prev, vehicle];
@@ -66,6 +66,11 @@ export default function App() {
   const filteredVehicles = useMemo(() => {
     return vehicles
       .filter((vehicle) => {
+        // Year filter (2020+)
+        if (selectedYear !== 'All Years' && vehicle.year !== parseInt(selectedYear, 10)) {
+          return false;
+        }
+
         // Category Filter
         if (selectedCategory === 'Cars') {
           if (vehicle.type !== 'car') return false;
@@ -83,7 +88,8 @@ export default function App() {
           const matchEngine = vehicle.engine.toLowerCase().includes(q);
           const matchCategory = vehicle.category.toLowerCase().includes(q);
           const matchFuel = vehicle.fuelType.toLowerCase().includes(q);
-          if (!matchName && !matchBrand && !matchEngine && !matchCategory && !matchFuel) {
+          const matchYear = vehicle.year.toString().includes(q);
+          if (!matchName && !matchBrand && !matchEngine && !matchCategory && !matchFuel && !matchYear) {
             return false;
           }
         }
@@ -103,9 +109,12 @@ export default function App() {
         if (sortBy === 'price-desc') {
           return parseNum(b.price) - parseNum(a.price);
         }
+        if (sortBy === 'year-desc') {
+          return b.year - a.year;
+        }
         return 0; // 'featured' keeps original curated order
       });
-  }, [selectedCategory, searchQuery, sortBy]);
+  }, [selectedCategory, selectedYear, searchQuery, sortBy]);
 
   return (
     <div className="min-h-screen bg-carbon-mesh flex flex-col selection:bg-racing-red selection:text-white">
@@ -128,56 +137,79 @@ export default function App() {
       {/* Main Catalog Section */}
       <main ref={catalogRef} className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
         
-        {/* Controls Bar: Category Pills & Sort Dropdown */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        {/* Category Pills Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-4 scrollbar-none">
+          {categories.map((cat) => {
+            const count = vehicles.filter((v) => {
+              if (selectedYear !== 'All Years' && v.year !== parseInt(selectedYear, 10)) return false;
+              if (cat === 'All') return true;
+              if (cat === 'Cars') return v.type === 'car';
+              if (cat === 'Bikes') return v.type === 'bike';
+              return v.category === cat;
+            }).length;
+
+            const isSelected = selectedCategory === cat;
+
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  isSelected
+                    ? 'bg-racing-red text-white shadow-md shadow-racing-red/20'
+                    : 'bg-carbon-800 hover:bg-carbon-700 text-gray-400 hover:text-white border border-white/5'
+                }`}
+              >
+                <span>{cat}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  isSelected ? 'bg-black/30 text-white' : 'bg-carbon-700 text-gray-400'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Filter Controls Bar: Year Filter & Sort Dropdown */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 bg-carbon-800/50 p-4 rounded-2xl border border-white/5">
           
-          {/* Category Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
-            {categories.map((cat) => {
-              const count = vehicles.filter((v) => {
-                if (cat === 'All') return true;
-                if (cat === 'Cars') return v.type === 'car';
-                if (cat === 'Bikes') return v.type === 'bike';
-                return v.category === cat;
-              }).length;
-
-              const isSelected = selectedCategory === cat;
-
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                    isSelected
-                      ? 'bg-racing-red text-white shadow-md shadow-racing-red/20'
-                      : 'bg-carbon-800 hover:bg-carbon-700 text-gray-400 hover:text-white border border-white/5'
-                  }`}
-                >
-                  <span>{cat}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    isSelected ? 'bg-black/30 text-white' : 'bg-carbon-700 text-gray-400'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+          {/* Year Filter Buttons */}
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            <span className="text-xs text-gray-400 flex items-center gap-1 font-semibold mr-1">
+              <Calendar className="w-3.5 h-3.5 text-turbo-amber" />
+              Year:
+            </span>
+            {availableYears.map((yr) => (
+              <button
+                key={yr}
+                onClick={() => setSelectedYear(yr)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  selectedYear === yr
+                    ? 'bg-turbo-amber text-carbon-900 font-bold shadow-sm shadow-turbo-amber/30'
+                    : 'bg-carbon-700/60 text-gray-400 hover:text-white border border-white/5'
+                }`}
+              >
+                {yr}
+              </button>
+            ))}
           </div>
 
           {/* Sort By Dropdown */}
-          <div className="flex items-center gap-2 self-end md:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
             <span className="text-xs text-gray-400 flex items-center gap-1">
               <ArrowUpDown className="w-3.5 h-3.5 text-racing-red" />
-              Sort By:
+              Sort:
             </span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-carbon-800 text-white text-xs py-2 px-3 rounded-xl border border-white/10 focus:outline-none focus:border-racing-red"
+              className="bg-carbon-700 text-white text-xs py-1.5 px-3 rounded-xl border border-white/10 focus:outline-none focus:border-racing-red"
             >
               <option value="featured">Featured Curated</option>
               <option value="horsepower-desc">Highest Horsepower</option>
               <option value="speed-desc">Highest Top Speed</option>
+              <option value="year-desc">Newest Year (2024 - 2020)</option>
               <option value="price-asc">Price: Low to High</option>
               <option value="price-desc">Price: High to Low</option>
             </select>
@@ -189,16 +221,23 @@ export default function App() {
         <div className="flex items-center justify-between text-xs text-gray-400 mb-6 px-1">
           <div>
             Showing <span className="text-white font-semibold">{filteredVehicles.length}</span> {filteredVehicles.length === 1 ? 'vehicle' : 'vehicles'}
+            {selectedYear !== 'All Years' && (
+              <span> from model year <span className="text-turbo-amber font-semibold">{selectedYear}</span></span>
+            )}
             {searchQuery && (
               <span> matching "<span className="text-racing-red">{searchQuery}</span>"</span>
             )}
           </div>
-          {searchQuery && (
+          {(searchQuery || selectedCategory !== 'All' || selectedYear !== 'All Years') && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('All');
+                setSelectedYear('All Years');
+              }}
               className="text-racing-red hover:underline font-semibold"
             >
-              Reset search
+              Reset all filters
             </button>
           )}
         </div>
@@ -221,23 +260,24 @@ export default function App() {
             <SlidersHorizontal className="w-12 h-12 text-gray-500 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-white mb-1">No matching vehicles found</h3>
             <p className="text-sm text-gray-400 max-w-sm mx-auto mb-6">
-              Try refining your search keyword, adjusting your category filters, or browsing all vehicles.
+              Try adjusting your year, category, or search filters to explore vehicles.
             </p>
             <button
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('All');
+                setSelectedYear('All Years');
               }}
               className="px-5 py-2.5 rounded-xl bg-racing-red text-white text-xs font-bold hover:bg-racing-crimson transition-colors"
             >
-              View Full Fleet
+              View Full Fleet (2020 - Present)
             </button>
           </div>
         )}
 
       </main>
 
-      {/* Floating Bottom Comparison Drawer (appears when 1 or 2 vehicles are selected) */}
+      {/* Floating Bottom Comparison Drawer */}
       {compareList.length > 0 && (
         <aside aria-label="Comparison Tray" className="fixed bottom-6 right-6 z-40 bg-carbon-900/95 border border-turbo-amber/40 shadow-2xl shadow-black/80 backdrop-blur-xl p-4 rounded-2xl flex items-center gap-4 animate-bounce-short">
           <div className="flex items-center gap-2">
